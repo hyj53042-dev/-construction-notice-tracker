@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공사계획신고 접수·수리 현황</title>
+<style>
+  :root {
+    --blue: #2563eb;
+    --blue-light: #dbeafe;
+    --green: #16a34a;
+    --green-light: #dcfce7;
+    --red: #dc2626;
+    --red-light: #fee2e2;
+    --amber: #d97706;
+    --amber-light: #fef3c7;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-700: #374151;
+    --gray-900: #111827;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    padding: 16px;
+  }
+  .container { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--gray-500); font-size: 13px; margin: 0 0 20px; }
+
+  /* Dashboard */
+  .dash {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+  }
+  .card .num { font-size: 26px; font-weight: 700; line-height: 1.2; }
+  .card .label { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+  .card.total .num { color: var(--gray-900); }
+  .card.approved .num { color: var(--green); }
+  .card.pending .num { color: var(--amber); }
+  .card.overdue .num { color: var(--red); }
+
+  /* Layout */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 800px) {
+    .dash { grid-template-columns: repeat(2, 1fr); }
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; }
+
+  /* Calendar */
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .cal-header button {
+    border: none; background: var(--gray-100); border-radius: 8px;
+    width: 28px; height: 28px; cursor: pointer; font-size: 14px;
+  }
+  .cal-title { font-weight: 600; font-size: 14px; }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    font-size: 11px;
+  }
+  .cal-dow { text-align: center; color: var(--gray-400); padding: 4px 0; font-weight: 600; }
+  .cal-cell {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    background: var(--gray-50);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 2px;
+  }
+  .cal-cell.empty { background: transparent; }
+  .cal-cell .d { font-size: 10px; color: var(--gray-500); }
+  .cal-dots { display: flex; gap: 2px; margin-top: 2px; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .dot.submit { background: var(--blue); }
+  .dot.approve { background: var(--green); }
+  .legend { display: flex; gap: 14px; margin-top: 10px; font-size: 11px; color: var(--gray-500); }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+
+  /* Form */
+  form { display: flex; flex-direction: column; gap: 8px; }
+  form .row { display: flex; gap: 8px; }
+  form .row > div { flex: 1; }
+  label { font-size: 11px; color: var(--gray-500); display: block; margin-bottom: 3px; }
+  input, textarea, select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--gray-200);
+    border-radius: 8px; font-size: 13px; font-family: inherit; background: white;
+  }
+  textarea { resize: vertical; min-height: 40px; }
+  button.submit {
+    margin-top: 4px; padding: 9px; border: none; border-radius: 8px;
+    background: var(--blue); color: white; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  button.submit:hover { background: #1d4ed8; }
+
+  /* List */
+  .list-panel { grid-column: 1 / -1; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--gray-100); }
+  th { font-size: 11px; color: var(--gray-500); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge.done { background: var(--green-light); color: var(--green); }
+  .badge.wait { background: var(--amber-light); color: var(--amber); }
+  .badge.overdue { background: var(--red-light); color: var(--red); }
+  .del-btn {
+    border: none; background: none; color: var(--gray-400);
+    cursor: pointer; font-size: 13px;
+  }
+  .del-btn:hover { color: var(--red); }
+  tr[data-id] { cursor: pointer; }
+  tr[data-id]:hover { background: var(--gray-50); }
+  td.approve-cell { position: relative; }
+  td.approve-cell input[type="date"] {
+    padding: 4px 6px; font-size: 12px; border-radius: 6px;
+  }
+  .empty-state { color: var(--gray-400); font-size: 13px; text-align: center; padding: 20px; }
+  .loading { color: var(--gray-400); font-size: 13px; text-align: center; padding: 20px; }
+
+  .edit-btn {
+    border: none; background: none; color: var(--gray-400);
+    cursor: pointer; font-size: 13px; margin-right: 6px;
+  }
+  .edit-btn:hover { color: var(--blue); }
+
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0; background: rgba(17,24,39,0.4);
+    align-items: center; justify-content: center; z-index: 50;
+    padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: white; border-radius: 14px; padding: 20px;
+    width: 100%; max-width: 360px;
+  }
+  .modal h3 { margin: 0 0 14px; font-size: 15px; }
+  .modal-actions {
+    display: flex; gap: 8px; margin-top: 14px;
+  }
+  .modal-actions button {
+    flex: 1; padding: 9px; border-radius: 8px; border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .modal-actions .save-btn { background: var(--blue); color: white; }
+  .modal-actions .save-btn:hover { background: #1d4ed8; }
+  .modal-actions .cancel-btn { background: var(--gray-100); color: var(--gray-700); }
+  .modal-actions .cancel-btn:hover { background: var(--gray-200); }
+
+  /* Type filter tabs */
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .tab-btn {
+    padding: 7px 14px; border-radius: 999px; border: 1px solid var(--gray-200);
+    background: white; font-size: 12px; font-weight: 600; color: var(--gray-500);
+    cursor: pointer;
+  }
+  .tab-btn.active { background: var(--gray-900); color: white; border-color: var(--gray-900); }
+
+  .type-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .type-badge.plan { background: var(--blue-light); color: var(--blue); }
+  .type-badge.review { background: #ede9fe; color: #7c3aed; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>공사계획신고 접수·수리 현황</h1>
+  <p class="subtitle">지자체 접수일 / 수리일을 기록하고 진행 상황을 한눈에 확인합니다</p>
+
+  <div class="tabs" id="typeTabs">
+    <button class="tab-btn active" data-type="all">전체</button>
+    <button class="tab-btn" data-type="plan">공사계획신고</button>
+    <button class="tab-btn" data-type="review">사전기술검토</button>
+  </div>
+
+  <div class="dash">
+    <div class="card total"><div class="num" id="statTotal">-</div><div class="label">총 접수</div></div>
+    <div class="card approved"><div class="num" id="statApproved">-</div><div class="label">수리 완료</div></div>
+    <div class="card pending"><div class="num" id="statPending">-</div><div class="label">미수리</div></div>
+    <div class="card overdue"><div class="num" id="statOverdue">-</div><div class="label">최장 경과일(미수리)</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="cal-header">
+        <button id="prevMonth">‹</button>
+        <div class="cal-title" id="calTitle">-</div>
+        <button id="nextMonth">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="legend">
+        <span><span class="dot submit"></span>접수일</span>
+        <span><span class="dot approve"></span>수리일</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>새 항목 등록</h2>
+      <form id="entryForm">
+        <div>
+          <label>구분</label>
+          <select id="entryType" required>
+            <option value="plan">공사계획신고</option>
+            <option value="review">사전기술검토</option>
+          </select>
+        </div>
+        <div>
+          <label>현장명 / 지자체</label>
+          <input type="text" id="siteName" placeholder="예: OO시청 - OO태양광" required>
+        </div>
+        <div class="row">
+          <div>
+            <label>접수일</label>
+            <input type="date" id="submitDate" required>
+          </div>
+          <div>
+            <label>수리일 (미수리 시 비워둠)</label>
+            <input type="date" id="approveDate">
+          </div>
+        </div>
+        <div>
+          <label>메모</label>
+          <textarea id="memo" placeholder="선택 입력"></textarea>
+        </div>
+        <button type="submit" class="submit">등록</button>
+      </form>
+    </div>
+
+    <div class="panel list-panel">
+      <h2>전체 목록</h2>
+      <div id="listArea"><div class="loading">불러오는 중...</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editOverlay">
+  <div class="modal">
+    <h3>항목 수정</h3>
+    <form id="editForm">
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div>
+          <label>구분</label>
+          <select id="editType">
+            <option value="plan">공사계획신고</option>
+            <option value="review">사전기술검토</option>
+          </select>
+        </div>
+        <div>
+          <label>현장명 / 지자체</label>
+          <input type="text" id="editSiteName" required>
+        </div>
+        <div class="row">
+          <div>
+            <label>접수일</label>
+            <input type="date" id="editSubmitDate" required>
+          </div>
+          <div>
+            <label>수리일</label>
+            <input type="date" id="editApproveDate">
+          </div>
+        </div>
+        <div>
+          <label>메모</label>
+          <textarea id="editMemo"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="cancel-btn" id="editCancelBtn">취소</button>
+        <button type="submit" class="save-btn">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA6gtWjTcbPPy4znu4ttE99dl-SdrAOJ94",
+  authDomain: "construction-notice-tracker.firebaseapp.com",
+  projectId: "construction-notice-tracker",
+  storageBucket: "construction-notice-tracker.firebasestorage.app",
+  messagingSenderId: "352226819644",
+  appId: "1:352226819644:web:97e9626532a5a6f1de8d39"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const docRef = doc(db, "trackers", "construction-notice");
+
+let records = [];
+let currentMonth = new Date();
+let currentFilter = 'all';
+const TYPE_LABEL = { plan: '공사계획신고', review: '사전기술검토' };
+
+function filteredRecords() {
+  if (currentFilter === 'all') return records;
+  return records.filter(r => (r.type || 'plan') === currentFilter);
+}
+
+onSnapshot(docRef, (snap) => {
+  records = snap.exists() ? (snap.data().records || []) : [];
+  render();
+}, (err) => {
+  console.error('동기화 실패', err);
+  document.getElementById('listArea').innerHTML =
+    '<div class="empty-state">데이터를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.</div>';
+});
+
+async function saveRecords() {
+  try {
+    await setDoc(docRef, { records });
+  } catch (e) {
+    console.error('저장 실패', e);
+    alert('저장에 실패했습니다. 인터넷 연결을 확인해주세요.');
+  }
+}
+
+function daysBetween(dateStr, toDateStr) {
+  const a = new Date(dateStr);
+  const b = toDateStr ? new Date(toDateStr) : new Date();
+  return Math.floor((b - a) / (1000 * 60 * 60 * 24));
+}
+
+function render() {
+  renderStats();
+  renderCalendar();
+  renderList();
+}
+
+function renderStats() {
+  const data = filteredRecords();
+  const total = data.length;
+  const approved = data.filter(r => r.approveDate).length;
+  const pending = total - approved;
+  const pendingRecords = data.filter(r => !r.approveDate);
+  const maxOverdue = pendingRecords.length
+    ? Math.max(...pendingRecords.map(r => daysBetween(r.submitDate)))
+    : 0;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statApproved').textContent = approved;
+  document.getElementById('statPending').textContent = pending;
+  document.getElementById('statOverdue').textContent = pending ? maxOverdue + '일' : '-';
+}
+
+function renderCalendar() {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  document.getElementById('calTitle').textContent = `${year}년 ${month + 1}월`;
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  ['일','월','화','수','목','금','토'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-cell empty';
+    grid.appendChild(el);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const data = filteredRecords();
+    const hasSubmit = data.some(r => r.submitDate === dateStr);
+    const hasApprove = data.some(r => r.approveDate === dateStr);
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell';
+    const dayEl = document.createElement('div');
+    dayEl.className = 'd';
+    dayEl.textContent = d;
+    cell.appendChild(dayEl);
+
+    if (hasSubmit || hasApprove) {
+      const dots = document.createElement('div');
+      dots.className = 'cal-dots';
+      if (hasSubmit) {
+        const dot = document.createElement('div');
+        dot.className = 'dot submit';
+        dots.appendChild(dot);
+      }
+      if (hasApprove) {
+        const dot = document.createElement('div');
+        dot.className = 'dot approve';
+        dots.appendChild(dot);
+      }
+      cell.appendChild(dots);
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function renderList() {
+  const area = document.getElementById('listArea');
+  const data = filteredRecords();
+  if (!data.length) {
+    area.innerHTML = '<div class="empty-state">등록된 항목이 없습니다</div>';
+    return;
+  }
+
+  const sorted = [...data].sort((a, b) => new Date(b.submitDate) - new Date(a.submitDate));
+
+  let html = '<table><thead><tr><th>구분</th><th>현장명 / 지자체</th><th>접수일</th><th>수리일</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>';
+  sorted.forEach(r => {
+    let badge;
+    if (r.approveDate) {
+      const took = daysBetween(r.submitDate, r.approveDate);
+      badge = `<span class="badge done">수리완료 (${took}일 소요)</span>`;
+    } else {
+      const elapsed = daysBetween(r.submitDate);
+      const cls = elapsed >= 20 ? 'overdue' : 'wait';
+      badge = `<span class="badge ${cls}">미수리 - ${elapsed}일 경과</span>`;
+    }
+    const type = r.type || 'plan';
+    const typeBadge = `<span class="type-badge ${type}">${TYPE_LABEL[type]}</span>`;
+    html += `<tr data-id="${r.id}">
+      <td>${typeBadge}</td>
+      <td>${escapeHtml(r.siteName)}</td>
+      <td>${r.submitDate}</td>
+      <td class="approve-cell" data-field="approveDate">${r.approveDate || '<span style="color:var(--gray-400)">클릭하여 입력</span>'}</td>
+      <td>${badge}</td>
+      <td>${escapeHtml(r.memo || '')}</td>
+      <td><button class="edit-btn" data-id="${r.id}">✎</button><button class="del-btn" data-id="${r.id}">삭제</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  area.innerHTML = html;
+
+  area.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal(btn.dataset.id);
+    });
+  });
+
+  area.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      records = records.filter(r => r.id !== btn.dataset.id);
+      await saveRecords();
+      render();
+    });
+  });
+
+  area.querySelectorAll('.approve-cell').forEach(cell => {
+    cell.addEventListener('click', function handler() {
+      if (cell.querySelector('input')) return;
+      const row = cell.closest('tr');
+      const id = row.dataset.id;
+      const record = records.find(r => r.id === id);
+      const currentVal = record.approveDate || '';
+
+      cell.innerHTML = '';
+      const input = document.createElement('input');
+      input.type = 'date';
+      input.value = currentVal;
+      cell.appendChild(input);
+      input.focus();
+
+      const save = async () => {
+        record.approveDate = input.value || null;
+        await saveRecords();
+        render();
+      };
+      input.addEventListener('change', save);
+      input.addEventListener('blur', save, { once: true });
+    });
+  });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+document.getElementById('entryForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const type = document.getElementById('entryType').value;
+  const siteName = document.getElementById('siteName').value.trim();
+  const submitDate = document.getElementById('submitDate').value;
+  const approveDate = document.getElementById('approveDate').value;
+  const memo = document.getElementById('memo').value.trim();
+
+  if (!siteName || !submitDate) return;
+
+  records.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+    type, siteName, submitDate, approveDate: approveDate || null, memo
+  });
+
+  await saveRecords();
+  e.target.reset();
+  render();
+});
+
+function openEditModal(id) {
+  const record = records.find(r => r.id === id);
+  if (!record) return;
+
+  document.getElementById('editType').value = record.type || 'plan';
+  document.getElementById('editSiteName').value = record.siteName;
+  document.getElementById('editSubmitDate').value = record.submitDate;
+  document.getElementById('editApproveDate').value = record.approveDate || '';
+  document.getElementById('editMemo').value = record.memo || '';
+  document.getElementById('editForm').dataset.editingId = id;
+
+  document.getElementById('editOverlay').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('editOverlay').classList.remove('open');
+}
+
+document.getElementById('editCancelBtn').addEventListener('click', closeEditModal);
+document.getElementById('editOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'editOverlay') closeEditModal();
+});
+
+document.getElementById('editForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = e.target.dataset.editingId;
+  const record = records.find(r => r.id === id);
+  if (!record) return;
+
+  record.type = document.getElementById('editType').value;
+  record.siteName = document.getElementById('editSiteName').value.trim();
+  record.submitDate = document.getElementById('editSubmitDate').value;
+  record.approveDate = document.getElementById('editApproveDate').value || null;
+  record.memo = document.getElementById('editMemo').value.trim();
+
+  await saveRecords();
+  closeEditModal();
+  render();
+});
+
+document.getElementById('typeTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  currentFilter = btn.dataset.type;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+});
+
+document.getElementById('prevMonth').addEventListener('click', () => {
+  currentMonth.setMonth(currentMonth.getMonth() - 1);
+  renderCalendar();
+});
+document.getElementById('nextMonth').addEventListener('click', () => {
+  currentMonth.setMonth(currentMonth.getMonth() + 1);
+  renderCalendar();
+});
+
+// 데이터는 onSnapshot이 자동으로 실시간 동기화합니다.
+</script>
+</body>
+</html>
