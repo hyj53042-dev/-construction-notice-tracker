@@ -357,6 +357,27 @@ async function saveRecords() {
   }
 }
 
+const SHEET_SYNC_URL = 'https://script.google.com/macros/s/AKfycbyCs_z_fz97DrtMWORyBiY_3N1msnm2yJ-xCCTQvYbm4y3eote-QIrprF2zK0fa-IeB/exec';
+
+async function syncToSheet(record) {
+  try {
+    await fetch(SHEET_SYNC_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        id: record.id,
+        siteName: record.siteName,
+        submitDate: record.submitDate,
+        type: record.type,
+        approveDate: record.approveDate
+      })
+    });
+  } catch (e) {
+    console.error('스프레드시트 동기화 실패', e);
+  }
+}
+
 function daysBetween(dateStr, toDateStr) {
   const a = new Date(dateStr);
   const b = toDateStr ? new Date(toDateStr) : new Date();
@@ -510,6 +531,7 @@ function renderList() {
       const save = async () => {
         record.approveDate = input.value || null;
         await saveRecords();
+        syncToSheet(record);
         render();
       };
       input.addEventListener('change', save);
@@ -534,12 +556,14 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
 
   if (!siteName || !submitDate) return;
 
-  records.push({
+  const newRecord = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2),
     type, siteName, submitDate, approveDate: approveDate || null, memo
-  });
+  };
+  records.push(newRecord);
 
   await saveRecords();
+  syncToSheet(newRecord);
   e.target.reset();
   render();
 });
@@ -580,6 +604,7 @@ document.getElementById('editForm').addEventListener('submit', async (e) => {
   record.memo = document.getElementById('editMemo').value.trim();
 
   await saveRecords();
+  syncToSheet(record);
   closeEditModal();
   render();
 });
