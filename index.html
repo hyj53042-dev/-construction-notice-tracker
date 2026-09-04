@@ -359,14 +359,14 @@ async function saveRecords() {
 
 const SHEET_SYNC_URL = 'https://script.google.com/macros/s/AKfycbyCs_z_fz97DrtMWORyBiY_3N1msnm2yJ-xCCTQvYbm4y3eote-QIrprF2zK0fa-IeB/exec';
 
-async function syncToSheet(record) {
+async function syncToSheet(record, action) {
   try {
     await fetch(SHEET_SYNC_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
-        id: record.id,
+        action,
         siteName: record.siteName,
         submitDate: record.submitDate,
         type: record.type,
@@ -529,9 +529,12 @@ function renderList() {
       input.focus();
 
       const save = async () => {
+        const wasApproved = !!record.approveDate;
         record.approveDate = input.value || null;
         await saveRecords();
-        syncToSheet(record);
+        if (!wasApproved && record.approveDate) {
+          syncToSheet(record, 'approve');
+        }
         render();
       };
       input.addEventListener('change', save);
@@ -563,7 +566,10 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
   records.push(newRecord);
 
   await saveRecords();
-  syncToSheet(newRecord);
+  syncToSheet(newRecord, 'submit');
+  if (newRecord.approveDate) {
+    syncToSheet(newRecord, 'approve');
+  }
   e.target.reset();
   render();
 });
@@ -597,6 +603,8 @@ document.getElementById('editForm').addEventListener('submit', async (e) => {
   const record = records.find(r => r.id === id);
   if (!record) return;
 
+  const wasApproved = !!record.approveDate;
+
   record.type = document.getElementById('editType').value;
   record.siteName = document.getElementById('editSiteName').value.trim();
   record.submitDate = document.getElementById('editSubmitDate').value;
@@ -604,7 +612,9 @@ document.getElementById('editForm').addEventListener('submit', async (e) => {
   record.memo = document.getElementById('editMemo').value.trim();
 
   await saveRecords();
-  syncToSheet(record);
+  if (!wasApproved && record.approveDate) {
+    syncToSheet(record, 'approve');
+  }
   closeEditModal();
   render();
 });
