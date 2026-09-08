@@ -131,6 +131,14 @@
 
   /* List */
   .list-panel { grid-column: 1 / -1; }
+  .list-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; gap: 12px; flex-wrap: wrap;
+  }
+  .search-input {
+    max-width: 220px; padding: 7px 12px; font-size: 13px;
+    border: 1px solid var(--gray-200); border-radius: 999px;
+  }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--gray-100); }
   th { font-size: 11px; color: var(--gray-500); font-weight: 600; }
@@ -268,7 +276,14 @@
     </div>
 
     <div class="panel list-panel">
-      <h2>전체 목록</h2>
+      <div class="list-header">
+        <h2 style="margin:0;">목록</h2>
+        <input type="text" id="searchInput" class="search-input" placeholder="현장명 검색...">
+      </div>
+      <div class="tabs" id="statusTabs">
+        <button class="tab-btn active" data-status="pending">진행중</button>
+        <button class="tab-btn" data-status="done">완료</button>
+      </div>
       <div id="listArea"><div class="loading">불러오는 중...</div></div>
     </div>
   </div>
@@ -332,11 +347,22 @@ const docRef = doc(db, "trackers", "construction-notice");
 let records = [];
 let currentMonth = new Date();
 let currentFilter = 'all';
+let currentStatus = 'pending';
+let searchQuery = '';
 const TYPE_LABEL = { plan: '공사계획신고', review: '사전기술검토' };
 
 function filteredRecords() {
   if (currentFilter === 'all') return records;
   return records.filter(r => (r.type || 'plan') === currentFilter);
+}
+
+function listRecords() {
+  let data = filteredRecords();
+  data = data.filter(r => currentStatus === 'done' ? !!r.approveDate : !r.approveDate);
+  if (searchQuery) {
+    data = data.filter(r => r.siteName.toLowerCase().includes(searchQuery));
+  }
+  return data;
 }
 
 onSnapshot(docRef, (snap) => {
@@ -463,13 +489,18 @@ function renderCalendar() {
 
 function renderList() {
   const area = document.getElementById('listArea');
-  const data = filteredRecords();
+  const data = listRecords();
   if (!data.length) {
-    area.innerHTML = '<div class="empty-state">등록된 항목이 없습니다</div>';
+    area.innerHTML = '<div class="empty-state">해당하는 항목이 없습니다</div>';
     return;
   }
 
-  const sorted = [...data].sort((a, b) => new Date(b.submitDate) - new Date(a.submitDate));
+  const sorted = [...data].sort((a, b) => {
+    if (currentStatus === 'done') {
+      return new Date(b.approveDate) - new Date(a.approveDate);
+    }
+    return daysBetween(b.submitDate) - daysBetween(a.submitDate);
+  });
 
   let html = '<table><thead><tr><th>구분</th><th>현장명 / 지자체</th><th>접수일</th><th>수리일</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>';
   sorted.forEach(r => {
@@ -623,9 +654,23 @@ document.getElementById('typeTabs').addEventListener('click', (e) => {
   const btn = e.target.closest('.tab-btn');
   if (!btn) return;
   currentFilter = btn.dataset.type;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  e.currentTarget.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   render();
+});
+
+document.getElementById('statusTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  currentStatus = btn.dataset.status;
+  e.currentTarget.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+});
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  searchQuery = e.target.value.trim().toLowerCase();
+  renderList();
 });
 
 document.getElementById('prevMonth').addEventListener('click', () => {
