@@ -105,6 +105,8 @@
     padding: 2px;
   }
   .cal-cell.empty { background: transparent; }
+  .cal-cell.has-events { cursor: pointer; }
+  .cal-cell.has-events:hover { background: var(--blue-light); }
   .cal-cell .d { font-size: 10px; color: var(--gray-500); }
   .cal-dots { display: flex; gap: 2px; margin-top: 2px; }
   .dot { width: 5px; height: 5px; border-radius: 50%; }
@@ -328,6 +330,16 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="dayOverlay">
+  <div class="modal">
+    <h3 id="dayModalTitle">날짜별 항목</h3>
+    <div id="dayModalBody" style="display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button type="button" class="cancel-btn" id="dayCloseBtn" style="flex:1;">닫기</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
@@ -469,6 +481,8 @@ function renderCalendar() {
     cell.appendChild(dayEl);
 
     if (hasSubmit || hasApprove) {
+      cell.classList.add('has-events');
+      cell.dataset.date = dateStr;
       const dots = document.createElement('div');
       dots.className = 'cal-dots';
       if (hasSubmit) {
@@ -626,6 +640,56 @@ function closeEditModal() {
 document.getElementById('editCancelBtn').addEventListener('click', closeEditModal);
 document.getElementById('editOverlay').addEventListener('click', (e) => {
   if (e.target.id === 'editOverlay') closeEditModal();
+});
+
+function openDayModal(dateStr) {
+  const data = filteredRecords();
+  const submitted = data.filter(r => r.submitDate === dateStr);
+  const approved = data.filter(r => r.approveDate === dateStr);
+
+  const [y, m, d] = dateStr.split('-');
+  document.getElementById('dayModalTitle').textContent = `${y}년 ${Number(m)}월 ${Number(d)}일`;
+
+  const body = document.getElementById('dayModalBody');
+  if (!submitted.length && !approved.length) {
+    body.innerHTML = '<div class="empty-state">이 날짜에 항목이 없습니다</div>';
+  } else {
+    let html = '';
+    if (submitted.length) {
+      html += '<div style="font-size:12px; font-weight:600; color:var(--blue);">접수</div>';
+      submitted.forEach(r => {
+        html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--gray-100);">
+          <span>${escapeHtml(r.siteName)} <span class="type-badge ${r.type || 'plan'}">${TYPE_LABEL[r.type || 'plan']}</span></span>
+        </div>`;
+      });
+    }
+    if (approved.length) {
+      html += '<div style="font-size:12px; font-weight:600; color:var(--green); margin-top:6px;">수리</div>';
+      approved.forEach(r => {
+        html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--gray-100);">
+          <span>${escapeHtml(r.siteName)} <span class="type-badge ${r.type || 'plan'}">${TYPE_LABEL[r.type || 'plan']}</span></span>
+        </div>`;
+      });
+    }
+    body.innerHTML = html;
+  }
+
+  document.getElementById('dayOverlay').classList.add('open');
+}
+
+function closeDayModal() {
+  document.getElementById('dayOverlay').classList.remove('open');
+}
+
+document.getElementById('calGrid').addEventListener('click', (e) => {
+  const cell = e.target.closest('.cal-cell.has-events');
+  if (!cell) return;
+  openDayModal(cell.dataset.date);
+});
+
+document.getElementById('dayCloseBtn').addEventListener('click', closeDayModal);
+document.getElementById('dayOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'dayOverlay') closeDayModal();
 });
 
 document.getElementById('editForm').addEventListener('submit', async (e) => {
