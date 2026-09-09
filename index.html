@@ -211,6 +211,7 @@
   }
   .type-badge.plan { background: var(--blue-light); color: var(--blue); }
   .type-badge.review { background: #ede9fe; color: #7c3aed; }
+  .type-badge.change { background: #ffedd5; color: #c2410c; }
 </style>
 </head>
 <body>
@@ -221,6 +222,7 @@
   <div class="tabs" id="typeTabs">
     <button class="tab-btn active" data-type="all">전체</button>
     <button class="tab-btn" data-type="plan">공사계획신고</button>
+    <button class="tab-btn" data-type="change">공사계획변경신고</button>
     <button class="tab-btn" data-type="review">사전기술검토</button>
   </div>
 
@@ -252,6 +254,7 @@
           <label>구분</label>
           <select id="entryType" required>
             <option value="plan">공사계획신고</option>
+            <option value="change">공사계획변경신고</option>
             <option value="review">사전기술검토</option>
           </select>
         </div>
@@ -300,6 +303,7 @@
           <label>구분</label>
           <select id="editType">
             <option value="plan">공사계획신고</option>
+            <option value="change">공사계획변경신고</option>
             <option value="review">사전기술검토</option>
           </select>
         </div>
@@ -361,7 +365,7 @@ let currentMonth = new Date();
 let currentFilter = 'all';
 let currentStatus = 'pending';
 let searchQuery = '';
-const TYPE_LABEL = { plan: '공사계획신고', review: '사전기술검토' };
+const TYPE_LABEL = { plan: '공사계획신고', change: '공사계획변경신고', review: '사전기술검토' };
 
 function filteredRecords() {
   if (currentFilter === 'all') return records;
