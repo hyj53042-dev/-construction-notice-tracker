@@ -141,6 +141,27 @@
     max-width: 220px; padding: 7px 12px; font-size: 13px;
     border: 1px solid var(--gray-200); border-radius: 999px;
   }
+  .week-nav {
+    display: none; align-items: center; gap: 8px;
+    margin-bottom: 10px; font-size: 13px; font-weight: 600;
+  }
+  .week-nav.show { display: flex; }
+  .week-nav .nav-btn {
+    border: none; background: var(--gray-100); border-radius: 8px;
+    width: 26px; height: 26px; cursor: pointer; font-size: 13px;
+  }
+  .week-nav .report-btn {
+    margin-left: auto; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--gray-200); background: white;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .week-nav .report-btn:hover { background: var(--gray-50); }
+  .week-event-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+  }
+  .week-event-badge.submit { background: var(--blue-light); color: var(--blue); }
+  .week-event-badge.approve { background: var(--green-light); color: var(--green); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--gray-100); }
   th { font-size: 11px; color: var(--gray-500); font-weight: 600; }
@@ -288,6 +309,13 @@
       <div class="tabs" id="statusTabs">
         <button class="tab-btn active" data-status="pending">진행중</button>
         <button class="tab-btn" data-status="done">완료</button>
+        <button class="tab-btn" data-status="week">이번 주</button>
+      </div>
+      <div class="week-nav" id="weekNav">
+        <button type="button" class="nav-btn" id="prevWeek">‹</button>
+        <span id="weekRangeLabel"></span>
+        <button type="button" class="nav-btn" id="nextWeek">›</button>
+        <button type="button" class="report-btn" id="reportBtn">📋 리포트</button>
       </div>
       <div id="listArea"><div class="loading">불러오는 중...</div></div>
     </div>
@@ -344,6 +372,17 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="reportOverlay">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="reportTitle">주간 리포트</h3>
+    <pre id="reportBody" style="white-space:pre-wrap; font-family:inherit; font-size:13px; background:var(--gray-50); padding:12px; border-radius:8px; max-height:320px; overflow-y:auto; margin:0;"></pre>
+    <div class="modal-actions">
+      <button type="button" class="cancel-btn" id="reportCloseBtn">닫기</button>
+      <button type="button" class="save-btn" id="reportCopyBtn">복사</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
@@ -365,6 +404,7 @@ let currentMonth = new Date();
 let currentFilter = 'all';
 let currentStatus = 'pending';
 let searchQuery = '';
+let weekOffset = 0;
 const TYPE_LABEL = { plan: '공사계획신고', change: '공사계획변경신고', review: '사전기술검토' };
 
 function filteredRecords() {
@@ -379,6 +419,47 @@ function listRecords() {
     data = data.filter(r => r.siteName.toLowerCase().includes(searchQuery));
   }
   return data;
+}
+
+function toISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getWeekRange(offset) {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday + offset * 7);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { start: monday, end: sunday };
+}
+
+function formatMD(dateStr) {
+  const [, m, d] = dateStr.split('-');
+  return `${Number(m)}/${Number(d)}`;
+}
+
+function weekEvents() {
+  const { start, end } = getWeekRange(weekOffset);
+  const startStr = toISODate(start);
+  const endStr = toISODate(end);
+  const events = [];
+  filteredRecords().forEach(r => {
+    if (r.submitDate >= startStr && r.submitDate <= endStr) {
+      events.push({ date: r.submitDate, kind: '접수', record: r });
+    }
+    if (r.approveDate && r.approveDate >= startStr && r.approveDate <= endStr) {
+      events.push({ date: r.approveDate, kind: '수리', record: r });
+    }
+  });
+  events.sort((a, b) => a.date.localeCompare(b.date));
+  return events;
 }
 
 onSnapshot(docRef, (snap) => {
@@ -507,6 +588,12 @@ function renderCalendar() {
 
 function renderList() {
   const area = document.getElementById('listArea');
+
+  if (currentStatus === 'week') {
+    renderWeekList(area);
+    return;
+  }
+
   const data = listRecords();
   if (!data.length) {
     area.innerHTML = '<div class="empty-state">해당하는 항목이 없습니다</div>';
@@ -590,6 +677,64 @@ function renderList() {
       input.addEventListener('blur', save, { once: true });
     });
   });
+}
+
+function renderWeekList(area) {
+  const events = weekEvents();
+  if (!events.length) {
+    area.innerHTML = '<div class="empty-state">이번 주 항목이 없습니다</div>';
+    return;
+  }
+
+  let html = '<table><thead><tr><th>날짜</th><th>이벤트</th><th>구분</th><th>현장명 / 지자체</th><th>메모</th></tr></thead><tbody>';
+  events.forEach(ev => {
+    const r = ev.record;
+    const type = r.type || 'plan';
+    const kindClass = ev.kind === '접수' ? 'submit' : 'approve';
+    html += `<tr data-id="${r.id}" class="week-row">
+      <td>${formatMD(ev.date)}</td>
+      <td><span class="week-event-badge ${kindClass}">${ev.kind}</span></td>
+      <td><span class="type-badge ${type}">${TYPE_LABEL[type]}</span></td>
+      <td>${escapeHtml(r.siteName)}</td>
+      <td>${escapeHtml(r.memo || '')}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  area.innerHTML = html;
+
+  area.querySelectorAll('.week-row').forEach(row => {
+    row.addEventListener('click', () => openEditModal(row.dataset.id));
+  });
+}
+
+function updateWeekUI() {
+  const nav = document.getElementById('weekNav');
+  nav.classList.toggle('show', currentStatus === 'week');
+  if (currentStatus === 'week') {
+    const { start, end } = getWeekRange(weekOffset);
+    document.getElementById('weekRangeLabel').textContent =
+      `${start.getMonth() + 1}/${start.getDate()} ~ ${end.getMonth() + 1}/${end.getDate()}`;
+  }
+}
+
+function buildReportText() {
+  const { start, end } = getWeekRange(weekOffset);
+  const label = `${start.getMonth() + 1}/${start.getDate()}~${end.getMonth() + 1}/${end.getDate()}`;
+  const events = weekEvents();
+  const submitted = events.filter(e => e.kind === '접수');
+  const approved = events.filter(e => e.kind === '수리');
+
+  let text = `[${label} 진행사항]\n\n`;
+  text += `▶ 접수 (${submitted.length}건)\n`;
+  text += submitted.length
+    ? submitted.map(e => `- ${formatMD(e.date)} ${e.record.siteName} (${TYPE_LABEL[e.record.type || 'plan']})`).join('\n')
+    : '- 없음';
+  text += `\n\n▶ 수리 (${approved.length}건)\n`;
+  text += approved.length
+    ? approved.map(e => `- ${formatMD(e.date)} ${e.record.siteName} (${TYPE_LABEL[e.record.type || 'plan']})`).join('\n')
+    : '- 없음';
+
+  return text;
 }
 
 function escapeHtml(str) {
@@ -733,12 +878,51 @@ document.getElementById('statusTabs').addEventListener('click', (e) => {
   currentStatus = btn.dataset.status;
   e.currentTarget.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  updateWeekUI();
   renderList();
 });
 
 document.getElementById('searchInput').addEventListener('input', (e) => {
   searchQuery = e.target.value.trim().toLowerCase();
   renderList();
+});
+
+document.getElementById('prevWeek').addEventListener('click', () => {
+  weekOffset--;
+  updateWeekUI();
+  renderList();
+});
+document.getElementById('nextWeek').addEventListener('click', () => {
+  weekOffset++;
+  updateWeekUI();
+  renderList();
+});
+
+document.getElementById('reportBtn').addEventListener('click', () => {
+  const { start, end } = getWeekRange(weekOffset);
+  document.getElementById('reportTitle').textContent =
+    `${start.getMonth() + 1}/${start.getDate()} ~ ${end.getMonth() + 1}/${end.getDate()} 리포트`;
+  document.getElementById('reportBody').textContent = buildReportText();
+  document.getElementById('reportOverlay').classList.add('open');
+});
+
+document.getElementById('reportCloseBtn').addEventListener('click', () => {
+  document.getElementById('reportOverlay').classList.remove('open');
+});
+document.getElementById('reportOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'reportOverlay') document.getElementById('reportOverlay').classList.remove('open');
+});
+document.getElementById('reportCopyBtn').addEventListener('click', async () => {
+  const text = document.getElementById('reportBody').textContent;
+  const btn = document.getElementById('reportCopyBtn');
+  try {
+    await navigator.clipboard.writeText(text);
+    const original = btn.textContent;
+    btn.textContent = '복사됨!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch (e) {
+    alert('복사에 실패했습니다. 직접 선택해서 복사해주세요.');
+  }
 });
 
 document.getElementById('prevMonth').addEventListener('click', () => {
