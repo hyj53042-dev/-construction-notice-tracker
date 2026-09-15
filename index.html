@@ -89,31 +89,56 @@
   .cal-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 3px;
+    gap: 4px;
     font-size: 11px;
   }
   .cal-dow { text-align: center; color: var(--gray-400); padding: 4px 0; font-weight: 600; }
   .cal-cell {
-    aspect-ratio: 1;
+    height: 104px;
     border-radius: 8px;
     background: var(--gray-50);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
     position: relative;
-    padding: 2px;
+    padding: 4px;
+    gap: 2px;
+    overflow: hidden;
   }
   .cal-cell.empty { background: transparent; }
   .cal-cell.has-events { cursor: pointer; }
   .cal-cell.has-events:hover { background: var(--blue-light); }
-  .cal-cell .d { font-size: 10px; color: var(--gray-500); }
-  .cal-dots { display: flex; gap: 2px; margin-top: 2px; }
-  .dot { width: 5px; height: 5px; border-radius: 50%; }
-  .dot.submit { background: var(--blue); }
-  .dot.approve { background: var(--green); }
-  .legend { display: flex; gap: 14px; margin-top: 10px; font-size: 11px; color: var(--gray-500); }
+  .cal-cell .d {
+    font-size: 11px; color: var(--gray-500); font-weight: 600;
+    align-self: flex-start; margin-bottom: 1px;
+  }
+  .cal-cell.today .d {
+    background: var(--gray-900); color: white; border-radius: 999px;
+    width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+  }
+  .event-bar {
+    font-size: 10px; padding: 2px 5px; border-radius: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: pointer; font-weight: 600; line-height: 1.4;
+    box-sizing: border-box;
+  }
+  .event-bar.type-plan.submit { background: var(--blue); color: white; }
+  .event-bar.type-plan.approve { background: white; color: var(--blue); border: 1.3px solid var(--blue); }
+  .event-bar.type-change.submit { background: #f97316; color: white; }
+  .event-bar.type-change.approve { background: white; color: #f97316; border: 1.3px solid #f97316; }
+  .event-bar.type-review.submit { background: #7c3aed; color: white; }
+  .event-bar.type-review.approve { background: white; color: #7c3aed; border: 1.3px solid #7c3aed; }
+  .event-more {
+    font-size: 10px; color: var(--gray-500); cursor: pointer; padding: 1px 5px;
+  }
+  .event-more:hover { text-decoration: underline; }
+  .legend { display: flex; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--gray-500); flex-wrap: wrap; align-items: center; }
   .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .legend .swatch { width: 8px; height: 8px; border-radius: 2px; }
+  .legend .swatch.plan { background: var(--blue); }
+  .legend .swatch.change { background: #f97316; }
+  .legend .swatch.review { background: #7c3aed; }
+  .legend .sep { color: var(--gray-200); }
 
   /* Form */
   form { display: flex; flex-direction: column; gap: 8px; }
@@ -219,6 +244,18 @@
 
   /* Type filter tabs */
   .tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .header-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .header-row .tabs { margin-bottom: 16px; }
+  .primary-btn {
+    background: var(--blue); color: white; border: none;
+    padding: 9px 18px; border-radius: 999px; font-size: 13px;
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+    margin-bottom: 16px;
+  }
+  .primary-btn:hover { background: #1d4ed8; }
   .tab-btn {
     padding: 7px 14px; border-radius: 999px; border: 1px solid var(--gray-200);
     background: white; font-size: 12px; font-weight: 600; color: var(--gray-500);
@@ -240,11 +277,14 @@
   <h1>공사계획신고 접수·수리 현황</h1>
   <p class="subtitle">지자체 접수일 / 수리일을 기록하고 진행 상황을 한눈에 확인합니다</p>
 
-  <div class="tabs" id="typeTabs">
-    <button class="tab-btn active" data-type="all">전체</button>
-    <button class="tab-btn" data-type="plan">공사계획신고</button>
-    <button class="tab-btn" data-type="change">공사계획변경신고</button>
-    <button class="tab-btn" data-type="review">사전기술검토</button>
+  <div class="header-row">
+    <div class="tabs" id="typeTabs">
+      <button class="tab-btn active" data-type="all">전체</button>
+      <button class="tab-btn" data-type="plan">공사계획신고</button>
+      <button class="tab-btn" data-type="change">공사계획변경신고</button>
+      <button class="tab-btn" data-type="review">사전기술검토</button>
+    </div>
+    <button type="button" class="primary-btn" id="openEntryBtn">+ 새 항목 등록</button>
   </div>
 
   <div class="dash">
@@ -255,7 +295,7 @@
   </div>
 
   <div class="grid">
-    <div class="panel">
+    <div class="panel" style="grid-column: 1 / -1;">
       <div class="cal-header">
         <button id="prevMonth">‹</button>
         <div class="cal-title" id="calTitle">-</div>
@@ -263,14 +303,40 @@
       </div>
       <div class="cal-grid" id="calGrid"></div>
       <div class="legend">
-        <span><span class="dot submit"></span>접수일</span>
-        <span><span class="dot approve"></span>수리일</span>
+        <span><span class="swatch plan"></span>공사계획신고</span>
+        <span><span class="swatch change"></span>공사계획변경신고</span>
+        <span><span class="swatch review"></span>사전기술검토</span>
+        <span class="sep">|</span>
+        <span>■ 채움 = 접수 · □ 테두리 = 수리</span>
       </div>
     </div>
 
-    <div class="panel">
-      <h2>새 항목 등록</h2>
-      <form id="entryForm">
+    <div class="panel list-panel">
+      <div class="list-header">
+        <h2 style="margin:0;">목록</h2>
+        <input type="text" id="searchInput" class="search-input" placeholder="현장명 검색...">
+      </div>
+      <div class="tabs" id="statusTabs">
+        <button class="tab-btn active" data-status="pending">진행중</button>
+        <button class="tab-btn" data-status="done">완료</button>
+        <button class="tab-btn" data-status="week">이번 주</button>
+      </div>
+      <div class="week-nav" id="weekNav">
+        <button type="button" class="nav-btn" id="prevWeek">‹</button>
+        <span id="weekRangeLabel"></span>
+        <button type="button" class="nav-btn" id="nextWeek">›</button>
+        <button type="button" class="report-btn" id="reportBtn">📋 리포트</button>
+      </div>
+      <div id="listArea"><div class="loading">불러오는 중...</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="entryOverlay">
+  <div class="modal">
+    <h3>새 항목 등록</h3>
+    <form id="entryForm">
+      <div style="display:flex; flex-direction:column; gap:8px;">
         <div>
           <label>구분</label>
           <select id="entryType" required>
@@ -297,28 +363,12 @@
           <label>메모</label>
           <textarea id="memo" placeholder="선택 입력"></textarea>
         </div>
-        <button type="submit" class="submit">등록</button>
-      </form>
-    </div>
-
-    <div class="panel list-panel">
-      <div class="list-header">
-        <h2 style="margin:0;">목록</h2>
-        <input type="text" id="searchInput" class="search-input" placeholder="현장명 검색...">
       </div>
-      <div class="tabs" id="statusTabs">
-        <button class="tab-btn active" data-status="pending">진행중</button>
-        <button class="tab-btn" data-status="done">완료</button>
-        <button class="tab-btn" data-status="week">이번 주</button>
+      <div class="modal-actions">
+        <button type="button" class="cancel-btn" id="entryCancelBtn">취소</button>
+        <button type="submit" class="save-btn">등록</button>
       </div>
-      <div class="week-nav" id="weekNav">
-        <button type="button" class="nav-btn" id="prevWeek">‹</button>
-        <span id="weekRangeLabel"></span>
-        <button type="button" class="nav-btn" id="nextWeek">›</button>
-        <button type="button" class="report-btn" id="reportBtn">📋 리포트</button>
-      </div>
-      <div id="listArea"><div class="loading">불러오는 중...</div></div>
-    </div>
+    </form>
   </div>
 </div>
 
@@ -545,6 +595,8 @@ function renderCalendar() {
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = toISODate(new Date());
+  const MAX_VISIBLE = 3;
 
   for (let i = 0; i < firstDay; i++) {
     const el = document.createElement('div');
@@ -552,37 +604,56 @@ function renderCalendar() {
     grid.appendChild(el);
   }
 
+  const data = filteredRecords();
+
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const data = filteredRecords();
-    const hasSubmit = data.some(r => r.submitDate === dateStr);
-    const hasApprove = data.some(r => r.approveDate === dateStr);
+
+    const dayEvents = [];
+    data.forEach(r => {
+      if (r.submitDate === dateStr) dayEvents.push({ kind: 'submit', record: r });
+      if (r.approveDate === dateStr) dayEvents.push({ kind: 'approve', record: r });
+    });
 
     const cell = document.createElement('div');
     cell.className = 'cal-cell';
+    if (dateStr === todayStr) cell.classList.add('today');
+
     const dayEl = document.createElement('div');
     dayEl.className = 'd';
     dayEl.textContent = d;
     cell.appendChild(dayEl);
 
-    if (hasSubmit || hasApprove) {
+    if (dayEvents.length) {
       cell.classList.add('has-events');
       cell.dataset.date = dateStr;
-      const dots = document.createElement('div');
-      dots.className = 'cal-dots';
-      if (hasSubmit) {
-        const dot = document.createElement('div');
-        dot.className = 'dot submit';
-        dots.appendChild(dot);
+
+      dayEvents.slice(0, MAX_VISIBLE).forEach(ev => {
+        const bar = document.createElement('div');
+        const typeKey = ev.record.type || 'plan';
+        bar.className = `event-bar type-${typeKey} ${ev.kind}`;
+        bar.dataset.id = ev.record.id;
+        bar.textContent = (ev.kind === 'approve' ? '✓ ' : '') + ev.record.siteName;
+        bar.title = `${ev.kind === 'submit' ? '접수' : '수리'} · ${TYPE_LABEL[typeKey]} · ${ev.record.siteName}`;
+        cell.appendChild(bar);
+      });
+
+      if (dayEvents.length > MAX_VISIBLE) {
+        const more = document.createElement('div');
+        more.className = 'event-more';
+        more.textContent = `+${dayEvents.length - MAX_VISIBLE}개 더`;
+        cell.appendChild(more);
       }
-      if (hasApprove) {
-        const dot = document.createElement('div');
-        dot.className = 'dot approve';
-        dots.appendChild(dot);
-      }
-      cell.appendChild(dots);
     }
     grid.appendChild(cell);
+  }
+
+  const totalCells = firstDay + daysInMonth;
+  const trailing = (7 - (totalCells % 7)) % 7;
+  for (let i = 0; i < trailing; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-cell empty';
+    grid.appendChild(el);
   }
 }
 
@@ -765,7 +836,23 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
     syncToSheet(newRecord, 'approve');
   }
   e.target.reset();
+  closeEntryModal();
   render();
+});
+
+function openEntryModal() {
+  document.getElementById('entryForm').reset();
+  document.getElementById('entryOverlay').classList.add('open');
+}
+
+function closeEntryModal() {
+  document.getElementById('entryOverlay').classList.remove('open');
+}
+
+document.getElementById('openEntryBtn').addEventListener('click', openEntryModal);
+document.getElementById('entryCancelBtn').addEventListener('click', closeEntryModal);
+document.getElementById('entryOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'entryOverlay') closeEntryModal();
 });
 
 function openEditModal(id) {
@@ -831,6 +918,11 @@ function closeDayModal() {
 }
 
 document.getElementById('calGrid').addEventListener('click', (e) => {
+  const bar = e.target.closest('.event-bar');
+  if (bar) {
+    openEditModal(bar.dataset.id);
+    return;
+  }
   const cell = e.target.closest('.cal-cell.has-events');
   if (!cell) return;
   openDayModal(cell.dataset.date);
