@@ -326,6 +326,7 @@
         <span id="weekRangeLabel"></span>
         <button type="button" class="nav-btn" id="nextWeek">›</button>
         <button type="button" class="report-btn" id="reportBtn">📋 리포트</button>
+        <button type="button" class="report-btn" id="artifactReportBtn">🗂️ 회의자료용</button>
       </div>
       <div id="listArea"><div class="loading">불러오는 중...</div></div>
     </div>
@@ -345,9 +346,15 @@
             <option value="review">사전기술검토</option>
           </select>
         </div>
-        <div>
-          <label>현장명 / 지자체</label>
-          <input type="text" id="siteName" placeholder="예: OO시청 - OO태양광" required>
+        <div class="row">
+          <div>
+            <label>발전소명 (현장명)</label>
+            <input type="text" id="siteName" placeholder="예: OO태양광" required>
+          </div>
+          <div>
+            <label>지자체 / 지역</label>
+            <input type="text" id="region" placeholder="예: OO시">
+          </div>
         </div>
         <div class="row">
           <div>
@@ -357,6 +364,20 @@
           <div>
             <label>수리일 (미수리 시 비워둠)</label>
             <input type="date" id="approveDate">
+          </div>
+        </div>
+        <div>
+          <label>용량(kW)</label>
+          <input type="text" id="capacity" placeholder="예: 999.6">
+        </div>
+        <div class="row">
+          <div>
+            <label>착공일</label>
+            <input type="date" id="startDate">
+          </div>
+          <div>
+            <label>준공일</label>
+            <input type="date" id="endDate">
           </div>
         </div>
         <div>
@@ -385,9 +406,15 @@
             <option value="review">사전기술검토</option>
           </select>
         </div>
-        <div>
-          <label>현장명 / 지자체</label>
-          <input type="text" id="editSiteName" required>
+        <div class="row">
+          <div>
+            <label>발전소명 (현장명)</label>
+            <input type="text" id="editSiteName" required>
+          </div>
+          <div>
+            <label>지자체 / 지역</label>
+            <input type="text" id="editRegion" placeholder="예: OO시">
+          </div>
         </div>
         <div class="row">
           <div>
@@ -397,6 +424,20 @@
           <div>
             <label>수리일</label>
             <input type="date" id="editApproveDate">
+          </div>
+        </div>
+        <div>
+          <label>용량(kW)</label>
+          <input type="text" id="editCapacity" placeholder="예: 999.6">
+        </div>
+        <div class="row">
+          <div>
+            <label>착공일</label>
+            <input type="date" id="editStartDate">
+          </div>
+          <div>
+            <label>준공일</label>
+            <input type="date" id="editEndDate">
           </div>
         </div>
         <div>
@@ -456,6 +497,7 @@ let currentStatus = 'pending';
 let searchQuery = '';
 let weekOffset = 0;
 const TYPE_LABEL = { plan: '공사계획신고', change: '공사계획변경신고', review: '사전기술검토' };
+const KIND_LABEL = { plan: '최초', change: '변경' };
 
 function filteredRecords() {
   if (currentFilter === 'all') return records;
@@ -678,7 +720,7 @@ function renderList() {
     return daysBetween(b.submitDate) - daysBetween(a.submitDate);
   });
 
-  let html = '<table><thead><tr><th>구분</th><th>현장명 / 지자체</th><th>접수일</th><th>수리일</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th>구분</th><th>발전소명</th><th>접수일</th><th>수리일</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>';
   sorted.forEach(r => {
     let badge;
     if (r.approveDate) {
@@ -691,9 +733,10 @@ function renderList() {
     }
     const type = r.type || 'plan';
     const typeBadge = `<span class="type-badge ${type}">${TYPE_LABEL[type]}</span>`;
+    const siteCell = escapeHtml(r.siteName) + (r.region ? ` <span style="color:var(--gray-400); font-size:11px;">(${escapeHtml(r.region)})</span>` : '');
     html += `<tr data-id="${r.id}">
       <td>${typeBadge}</td>
-      <td>${escapeHtml(r.siteName)}</td>
+      <td>${siteCell}</td>
       <td>${r.submitDate}</td>
       <td class="approve-cell" data-field="approveDate">${r.approveDate || '<span style="color:var(--gray-400)">클릭하여 입력</span>'}</td>
       <td>${badge}</td>
@@ -757,16 +800,17 @@ function renderWeekList(area) {
     return;
   }
 
-  let html = '<table><thead><tr><th>날짜</th><th>이벤트</th><th>구분</th><th>현장명 / 지자체</th><th>메모</th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th>날짜</th><th>이벤트</th><th>구분</th><th>발전소명</th><th>메모</th></tr></thead><tbody>';
   events.forEach(ev => {
     const r = ev.record;
     const type = r.type || 'plan';
     const kindClass = ev.kind === '접수' ? 'submit' : 'approve';
+    const siteCell = escapeHtml(r.siteName) + (r.region ? ` <span style="color:var(--gray-400); font-size:11px;">(${escapeHtml(r.region)})</span>` : '');
     html += `<tr data-id="${r.id}" class="week-row">
       <td>${formatMD(ev.date)}</td>
       <td><span class="week-event-badge ${kindClass}">${ev.kind}</span></td>
       <td><span class="type-badge ${type}">${TYPE_LABEL[type]}</span></td>
-      <td>${escapeHtml(r.siteName)}</td>
+      <td>${siteCell}</td>
       <td>${escapeHtml(r.memo || '')}</td>
     </tr>`;
   });
@@ -808,6 +852,45 @@ function buildReportText() {
   return text;
 }
 
+// 회의자료(공사계획신고 아티팩트)용 복사 텍스트.
+// - 수리일/사전기술검토는 그 아티팩트에 항목이 없으므로 제외하고,
+// - 접수일 기준으로 이번 주에 해당하는 공사계획신고/변경신고만 뽑아
+//   그쪽 표 항목(구분/발전소/지역/용량/착공일/준공일/접수일)에 맞춰 정리합니다.
+function buildArtifactText() {
+  const { start, end } = getWeekRange(weekOffset);
+  const label = `${start.getMonth() + 1}/${start.getDate()}~${end.getMonth() + 1}/${end.getDate()}`;
+  const startStr = toISODate(start);
+  const endStr = toISODate(end);
+
+  const items = records
+    .filter(r => {
+      const type = r.type || 'plan';
+      if (type !== 'plan' && type !== 'change') return false;
+      return r.submitDate >= startStr && r.submitDate <= endStr;
+    })
+    .sort((a, b) => a.submitDate.localeCompare(b.submitDate));
+
+  let text = `[${label} 공사계획신고 등록 자료 - 회의자료 반영용]\n`;
+
+  if (!items.length) {
+    text += '\n해당 기간에 등록된 공사계획신고/변경신고가 없습니다.';
+    return text;
+  }
+
+  items.forEach((r, i) => {
+    text += `\n${i + 1}. ${r.siteName}\n`;
+    text += `   구분: ${KIND_LABEL[r.type || 'plan']}\n`;
+    text += `   지역: ${r.region || '-'}\n`;
+    text += `   용량(kW): ${r.capacity || '-'}\n`;
+    text += `   착공일: ${r.startDate || '-'}\n`;
+    text += `   준공일: ${r.endDate || '-'}\n`;
+    text += `   접수일: ${formatMD(r.submitDate)}\n`;
+    if (r.memo) text += `   비고: ${r.memo}\n`;
+  });
+
+  return text.trim();
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
@@ -818,15 +901,20 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const type = document.getElementById('entryType').value;
   const siteName = document.getElementById('siteName').value.trim();
+  const region = document.getElementById('region').value.trim();
   const submitDate = document.getElementById('submitDate').value;
   const approveDate = document.getElementById('approveDate').value;
+  const capacity = document.getElementById('capacity').value.trim();
+  const startDate = document.getElementById('startDate').value;
+  const endDate = document.getElementById('endDate').value;
   const memo = document.getElementById('memo').value.trim();
 
   if (!siteName || !submitDate) return;
 
   const newRecord = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-    type, siteName, submitDate, approveDate: approveDate || null, memo
+    type, siteName, region, submitDate, approveDate: approveDate || null,
+    capacity, startDate: startDate || null, endDate: endDate || null, memo
   };
   records.push(newRecord);
 
@@ -861,8 +949,12 @@ function openEditModal(id) {
 
   document.getElementById('editType').value = record.type || 'plan';
   document.getElementById('editSiteName').value = record.siteName;
+  document.getElementById('editRegion').value = record.region || '';
   document.getElementById('editSubmitDate').value = record.submitDate;
   document.getElementById('editApproveDate').value = record.approveDate || '';
+  document.getElementById('editCapacity').value = record.capacity || '';
+  document.getElementById('editStartDate').value = record.startDate || '';
+  document.getElementById('editEndDate').value = record.endDate || '';
   document.getElementById('editMemo').value = record.memo || '';
   document.getElementById('editForm').dataset.editingId = id;
 
@@ -894,16 +986,18 @@ function openDayModal(dateStr) {
     if (submitted.length) {
       html += '<div style="font-size:12px; font-weight:600; color:var(--blue);">접수</div>';
       submitted.forEach(r => {
+        const siteLabel = escapeHtml(r.siteName) + (r.region ? ` (${escapeHtml(r.region)})` : '');
         html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--gray-100);">
-          <span>${escapeHtml(r.siteName)} <span class="type-badge ${r.type || 'plan'}">${TYPE_LABEL[r.type || 'plan']}</span></span>
+          <span>${siteLabel} <span class="type-badge ${r.type || 'plan'}">${TYPE_LABEL[r.type || 'plan']}</span></span>
         </div>`;
       });
     }
     if (approved.length) {
       html += '<div style="font-size:12px; font-weight:600; color:var(--green); margin-top:6px;">수리</div>';
       approved.forEach(r => {
+        const siteLabel = escapeHtml(r.siteName) + (r.region ? ` (${escapeHtml(r.region)})` : '');
         html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--gray-100);">
-          <span>${escapeHtml(r.siteName)} <span class="type-badge ${r.type || 'plan'}">${TYPE_LABEL[r.type || 'plan']}</span></span>
+          <span>${siteLabel} <span class="type-badge ${r.type || 'plan'}">${TYPE_LABEL[r.type || 'plan']}</span></span>
         </div>`;
       });
     }
@@ -943,8 +1037,12 @@ document.getElementById('editForm').addEventListener('submit', async (e) => {
 
   record.type = document.getElementById('editType').value;
   record.siteName = document.getElementById('editSiteName').value.trim();
+  record.region = document.getElementById('editRegion').value.trim();
   record.submitDate = document.getElementById('editSubmitDate').value;
   record.approveDate = document.getElementById('editApproveDate').value || null;
+  record.capacity = document.getElementById('editCapacity').value.trim();
+  record.startDate = document.getElementById('editStartDate').value || null;
+  record.endDate = document.getElementById('editEndDate').value || null;
   record.memo = document.getElementById('editMemo').value.trim();
 
   await saveRecords();
@@ -995,6 +1093,14 @@ document.getElementById('reportBtn').addEventListener('click', () => {
   document.getElementById('reportTitle').textContent =
     `${start.getMonth() + 1}/${start.getDate()} ~ ${end.getMonth() + 1}/${end.getDate()} 리포트`;
   document.getElementById('reportBody').textContent = buildReportText();
+  document.getElementById('reportOverlay').classList.add('open');
+});
+
+document.getElementById('artifactReportBtn').addEventListener('click', () => {
+  const { start, end } = getWeekRange(weekOffset);
+  document.getElementById('reportTitle').textContent =
+    `${start.getMonth() + 1}/${start.getDate()} ~ ${end.getMonth() + 1}/${end.getDate()} 회의자료용`;
+  document.getElementById('reportBody').textContent = buildArtifactText();
   document.getElementById('reportOverlay').classList.add('open');
 });
 
