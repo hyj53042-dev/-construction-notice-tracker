@@ -150,6 +150,15 @@
     border-radius: 8px; font-size: 13px; font-family: inherit; background: white;
   }
   textarea { resize: vertical; min-height: 40px; }
+  .date-field { position: relative; }
+  .date-field input { padding-right: 30px; }
+  .date-pick-btn {
+    position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+    border: none; background: none; cursor: pointer; font-size: 14px;
+    padding: 4px 6px; line-height: 1; color: var(--gray-500);
+  }
+  .date-pick-btn:hover { color: var(--blue); }
+  input.invalid { border-color: var(--red); }
   button.submit {
     margin-top: 4px; padding: 9px; border: none; border-radius: 8px;
     background: var(--blue); color: white; font-size: 13px; font-weight: 600; cursor: pointer;
@@ -206,8 +215,8 @@
   tr[data-id] { cursor: pointer; }
   tr[data-id]:hover { background: var(--gray-50); }
   td.approve-cell { position: relative; }
-  td.approve-cell input[type="date"] {
-    padding: 4px 6px; font-size: 12px; border-radius: 6px;
+  td.approve-cell input {
+    padding: 4px 6px; font-size: 12px; border-radius: 6px; width: 90px;
   }
   .empty-state { color: var(--gray-400); font-size: 13px; text-align: center; padding: 20px; }
   .loading { color: var(--gray-400); font-size: 13px; text-align: center; padding: 20px; }
@@ -359,11 +368,17 @@
         <div class="row">
           <div>
             <label>접수일</label>
-            <input type="date" id="submitDate" required>
+            <div class="date-field">
+              <input type="text" id="submitDate" placeholder="예: 9/30" required>
+              <button type="button" class="date-pick-btn" data-for="submitDate">📅</button>
+            </div>
           </div>
           <div>
             <label>수리일 (미수리 시 비워둠)</label>
-            <input type="date" id="approveDate">
+            <div class="date-field">
+              <input type="text" id="approveDate" placeholder="예: 9/30">
+              <button type="button" class="date-pick-btn" data-for="approveDate">📅</button>
+            </div>
           </div>
         </div>
         <div>
@@ -373,11 +388,17 @@
         <div class="row">
           <div>
             <label>착공일</label>
-            <input type="date" id="startDate">
+            <div class="date-field">
+              <input type="text" id="startDate" placeholder="예: 9/30">
+              <button type="button" class="date-pick-btn" data-for="startDate">📅</button>
+            </div>
           </div>
           <div>
             <label>준공일</label>
-            <input type="date" id="endDate">
+            <div class="date-field">
+              <input type="text" id="endDate" placeholder="예: 9/30">
+              <button type="button" class="date-pick-btn" data-for="endDate">📅</button>
+            </div>
           </div>
         </div>
         <div>
@@ -419,11 +440,17 @@
         <div class="row">
           <div>
             <label>접수일</label>
-            <input type="date" id="editSubmitDate" required>
+            <div class="date-field">
+              <input type="text" id="editSubmitDate" placeholder="예: 9/30" required>
+              <button type="button" class="date-pick-btn" data-for="editSubmitDate">📅</button>
+            </div>
           </div>
           <div>
             <label>수리일</label>
-            <input type="date" id="editApproveDate">
+            <div class="date-field">
+              <input type="text" id="editApproveDate" placeholder="예: 9/30">
+              <button type="button" class="date-pick-btn" data-for="editApproveDate">📅</button>
+            </div>
           </div>
         </div>
         <div>
@@ -433,11 +460,17 @@
         <div class="row">
           <div>
             <label>착공일</label>
-            <input type="date" id="editStartDate">
+            <div class="date-field">
+              <input type="text" id="editStartDate" placeholder="예: 9/30">
+              <button type="button" class="date-pick-btn" data-for="editStartDate">📅</button>
+            </div>
           </div>
           <div>
             <label>준공일</label>
-            <input type="date" id="editEndDate">
+            <div class="date-field">
+              <input type="text" id="editEndDate" placeholder="예: 9/30">
+              <button type="button" class="date-pick-btn" data-for="editEndDate">📅</button>
+            </div>
           </div>
         </div>
         <div>
@@ -518,6 +551,121 @@ function toISODate(d) {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+// 스프레드시트처럼 "9/30", "9-30", "930", "2026.9.30" 등을 "YYYY-MM-DD"로 변환합니다.
+// 연도를 안 쓰면 올해로 채웁니다. 이미 YYYY-MM-DD 형식이면 그대로 반환.
+// 파싱에 실패하면 null을 반환합니다.
+function parseFlexibleDate(raw) {
+  const str = (raw || '').trim();
+  if (!str) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split('-').map(Number);
+    return isValidYMD(y, m, d) ? str : null;
+  }
+
+  const today = new Date();
+  let y = today.getFullYear();
+  let m, d;
+
+  if (/^\d{8}$/.test(str)) {
+    // 20260930
+    y = Number(str.slice(0, 4)); m = Number(str.slice(4, 6)); d = Number(str.slice(6, 8));
+  } else if (/^\d{6}$/.test(str)) {
+    // 260930 -> 2026-09-30
+    y = 2000 + Number(str.slice(0, 2)); m = Number(str.slice(2, 4)); d = Number(str.slice(4, 6));
+  } else if (/^\d{3,4}$/.test(str)) {
+    // 930 -> 9/30, 1005 -> 10/5
+    if (str.length === 3) { m = Number(str.slice(0, 1)); d = Number(str.slice(1)); }
+    else { m = Number(str.slice(0, 2)); d = Number(str.slice(2)); }
+  } else if (/[\/\-.]/.test(str)) {
+    const parts = str.split(/[\/\-.]/).map(s => s.trim()).filter(Boolean);
+    if (parts.length === 2) {
+      [m, d] = parts.map(Number);
+    } else if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        [y, m, d] = parts.map(Number);
+      } else {
+        [m, d, y] = parts.map(Number);
+        if (y < 100) y += 2000;
+      }
+    } else {
+      return null;
+    }
+  } else {
+    return null;
+  }
+
+  if (!isValidYMD(y, m, d)) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function isValidYMD(y, m, d) {
+  if (!y || !m || !d) return false;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+// 날짜 텍스트 입력칸에 자동 변환(blur/Enter 시 정규화)을 연결합니다.
+function setupDateField(id) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+  });
+  input.addEventListener('blur', () => {
+    const raw = input.value.trim();
+    if (!raw) { input.classList.remove('invalid'); return; }
+    const parsed = parseFlexibleDate(raw);
+    if (parsed) {
+      input.value = parsed;
+      input.classList.remove('invalid');
+    } else {
+      input.classList.add('invalid');
+    }
+  });
+}
+
+['submitDate', 'approveDate', 'startDate', 'endDate',
+ 'editSubmitDate', 'editApproveDate', 'editStartDate', 'editEndDate'
+].forEach(setupDateField);
+
+document.querySelectorAll('.date-pick-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = document.getElementById(btn.dataset.for);
+    if (!target) return;
+    openNativeDatePicker(target);
+  });
+});
+
+// 📅 버튼 클릭 시 숨겨진 네이티브 달력을 잠깐 붙여 선택하게 하고,
+// 고른 값을 텍스트 입력칸에 그대로 채워 넣습니다.
+function openNativeDatePicker(targetInput) {
+  const temp = document.createElement('input');
+  temp.type = 'date';
+  temp.style.position = 'fixed';
+  temp.style.opacity = '0';
+  temp.style.left = '-9999px';
+  temp.style.top = '0';
+  const current = parseFlexibleDate(targetInput.value);
+  if (current) temp.value = current;
+  document.body.appendChild(temp);
+
+  const cleanup = () => { if (temp.parentNode) temp.parentNode.removeChild(temp); };
+  temp.addEventListener('change', () => {
+    targetInput.value = temp.value;
+    targetInput.classList.remove('invalid');
+    cleanup();
+  });
+  temp.addEventListener('blur', () => setTimeout(cleanup, 200));
+
+  if (typeof temp.showPicker === 'function') {
+    try { temp.showPicker(); } catch (e) { temp.focus(); temp.click(); }
+  } else {
+    temp.focus();
+    temp.click();
+  }
 }
 
 function getWeekRange(offset) {
@@ -773,22 +921,38 @@ function renderList() {
 
       cell.innerHTML = '';
       const input = document.createElement('input');
-      input.type = 'date';
+      input.type = 'text';
+      input.placeholder = '예: 9/30';
       input.value = currentVal;
       cell.appendChild(input);
       input.focus();
+      input.select();
 
+      let done = false;
       const save = async () => {
+        if (done) return;
+        const raw = input.value.trim();
+        const parsed = parseFlexibleDate(raw);
+        if (parsed === null) {
+          alert('날짜 형식을 확인해주세요. 예: 9/30, 2026-09-30');
+          input.focus();
+          return;
+        }
+        done = true;
         const wasApproved = !!record.approveDate;
-        record.approveDate = input.value || null;
+        record.approveDate = parsed || null;
         await saveRecords();
         if (!wasApproved && record.approveDate) {
           syncToSheet(record, 'approve');
         }
         render();
       };
-      input.addEventListener('change', save);
-      input.addEventListener('blur', save, { once: true });
+      const cancel = () => { done = true; render(); };
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
+        if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+      });
+      input.addEventListener('blur', save);
     });
   });
 }
@@ -902,13 +1066,18 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
   const type = document.getElementById('entryType').value;
   const siteName = document.getElementById('siteName').value.trim();
   const region = document.getElementById('region').value.trim();
-  const submitDate = document.getElementById('submitDate').value;
-  const approveDate = document.getElementById('approveDate').value;
   const capacity = document.getElementById('capacity').value.trim();
-  const startDate = document.getElementById('startDate').value;
-  const endDate = document.getElementById('endDate').value;
   const memo = document.getElementById('memo').value.trim();
 
+  const submitDate = parseFlexibleDate(document.getElementById('submitDate').value);
+  const approveDate = parseFlexibleDate(document.getElementById('approveDate').value);
+  const startDate = parseFlexibleDate(document.getElementById('startDate').value);
+  const endDate = parseFlexibleDate(document.getElementById('endDate').value);
+
+  if (submitDate === null || approveDate === null || startDate === null || endDate === null) {
+    alert('날짜 형식을 확인해주세요. 예: 9/30, 2026-09-30');
+    return;
+  }
   if (!siteName || !submitDate) return;
 
   const newRecord = {
@@ -1035,14 +1204,24 @@ document.getElementById('editForm').addEventListener('submit', async (e) => {
 
   const wasApproved = !!record.approveDate;
 
+  const editSubmitDate = parseFlexibleDate(document.getElementById('editSubmitDate').value);
+  const editApproveDate = parseFlexibleDate(document.getElementById('editApproveDate').value);
+  const editStartDate = parseFlexibleDate(document.getElementById('editStartDate').value);
+  const editEndDate = parseFlexibleDate(document.getElementById('editEndDate').value);
+
+  if (editSubmitDate === null || editApproveDate === null || editStartDate === null || editEndDate === null) {
+    alert('날짜 형식을 확인해주세요. 예: 9/30, 2026-09-30');
+    return;
+  }
+
   record.type = document.getElementById('editType').value;
   record.siteName = document.getElementById('editSiteName').value.trim();
   record.region = document.getElementById('editRegion').value.trim();
-  record.submitDate = document.getElementById('editSubmitDate').value;
-  record.approveDate = document.getElementById('editApproveDate').value || null;
+  record.submitDate = editSubmitDate;
+  record.approveDate = editApproveDate || null;
   record.capacity = document.getElementById('editCapacity').value.trim();
-  record.startDate = document.getElementById('editStartDate').value || null;
-  record.endDate = document.getElementById('editEndDate').value || null;
+  record.startDate = editStartDate || null;
+  record.endDate = editEndDate || null;
   record.memo = document.getElementById('editMemo').value.trim();
 
   await saveRecords();
