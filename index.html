@@ -152,12 +152,14 @@
   textarea { resize: vertical; min-height: 40px; }
   .date-field { position: relative; }
   .date-field input { padding-right: 30px; }
-  .date-pick-btn {
-    position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
-    border: none; background: none; cursor: pointer; font-size: 14px;
-    padding: 4px 6px; line-height: 1; color: var(--gray-500);
+  .date-native-overlay {
+    position: absolute; right: 0; top: 0; width: 28px; height: 100%;
+    opacity: 0; cursor: pointer; margin: 0; padding: 0; border: none;
   }
-  .date-pick-btn:hover { color: var(--blue); }
+  .date-pick-icon {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    font-size: 14px; color: var(--gray-500); pointer-events: none;
+  }
   input.invalid { border-color: var(--red); }
   button.submit {
     margin-top: 4px; padding: 9px; border: none; border-radius: 8px;
@@ -370,14 +372,14 @@
             <label>접수일</label>
             <div class="date-field">
               <input type="text" id="submitDate" placeholder="예: 9/30" required>
-              <button type="button" class="date-pick-btn" data-for="submitDate">📅</button>
+              <input type="date" class="date-native-overlay" data-for="submitDate" tabindex="-1" aria-hidden="true"><span class="date-pick-icon" aria-hidden="true">📅</span>
             </div>
           </div>
           <div>
             <label>수리일 (미수리 시 비워둠)</label>
             <div class="date-field">
               <input type="text" id="approveDate" placeholder="예: 9/30">
-              <button type="button" class="date-pick-btn" data-for="approveDate">📅</button>
+              <input type="date" class="date-native-overlay" data-for="approveDate" tabindex="-1" aria-hidden="true"><span class="date-pick-icon" aria-hidden="true">📅</span>
             </div>
           </div>
         </div>
@@ -390,14 +392,14 @@
             <label>착공일</label>
             <div class="date-field">
               <input type="text" id="startDate" placeholder="예: 9/30">
-              <button type="button" class="date-pick-btn" data-for="startDate">📅</button>
+              <input type="date" class="date-native-overlay" data-for="startDate" tabindex="-1" aria-hidden="true"><span class="date-pick-icon" aria-hidden="true">📅</span>
             </div>
           </div>
           <div>
             <label>준공일</label>
             <div class="date-field">
               <input type="text" id="endDate" placeholder="예: 9/30">
-              <button type="button" class="date-pick-btn" data-for="endDate">📅</button>
+              <input type="date" class="date-native-overlay" data-for="endDate" tabindex="-1" aria-hidden="true"><span class="date-pick-icon" aria-hidden="true">📅</span>
             </div>
           </div>
         </div>
@@ -442,14 +444,14 @@
             <label>접수일</label>
             <div class="date-field">
               <input type="text" id="editSubmitDate" placeholder="예: 9/30" required>
-              <button type="button" class="date-pick-btn" data-for="editSubmitDate">📅</button>
+              <input type="date" class="date-native-overlay" data-for="editSubmitDate" tabindex="-1" aria-hidden="true"><span class="date-pick-icon" aria-hidden="true">📅</span>
             </div>
           </div>
           <div>
             <label>수리일</label>
             <div class="date-field">
               <input type="text" id="editApproveDate" placeholder="예: 9/30">
-              <button type="button" class="date-pick-btn" data-for="editApproveDate">📅</button>
+              <input type="date" class="date-native-overlay" data-for="editApproveDate" tabindex="-1" aria-hidden="true"><span class="date-pick-icon" aria-hidden="true">📅</span>
             </div>
           </div>
         </div>
@@ -462,14 +464,14 @@
             <label>착공일</label>
             <div class="date-field">
               <input type="text" id="editStartDate" placeholder="예: 9/30">
-              <button type="button" class="date-pick-btn" data-for="editStartDate">📅</button>
+              <input type="date" class="date-native-overlay" data-for="editStartDate" tabindex="-1" aria-hidden="true"><span class="date-pick-icon" aria-hidden="true">📅</span>
             </div>
           </div>
           <div>
             <label>준공일</label>
             <div class="date-field">
               <input type="text" id="editEndDate" placeholder="예: 9/30">
-              <button type="button" class="date-pick-btn" data-for="editEndDate">📅</button>
+              <input type="date" class="date-native-overlay" data-for="editEndDate" tabindex="-1" aria-hidden="true"><span class="date-pick-icon" aria-hidden="true">📅</span>
             </div>
           </div>
         </div>
@@ -631,47 +633,24 @@ function setupDateField(id) {
  'editSubmitDate', 'editApproveDate', 'editStartDate', 'editEndDate'
 ].forEach(setupDateField);
 
-document.querySelectorAll('.date-pick-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const target = document.getElementById(btn.dataset.for);
+// 📅 자리에 실제 네이티브 date input을 투명하게 겹쳐두는 방식입니다.
+// (이전에 숨겨둔 input을 스크립트로 showPicker() 시키던 방식은 브라우저에 따라
+//  달력이 화면 구석에 엉뚱하게 뜨는 문제가 있어서, 클릭이 직접 그 자리의
+//  진짜 date input에 닿도록 바꿨습니다 — 이러면 항상 제자리에 뜹니다.)
+document.querySelectorAll('.date-native-overlay').forEach(nat => {
+  nat.addEventListener('mousedown', () => {
+    const target = document.getElementById(nat.dataset.for);
     if (!target) return;
-    openNativeDatePicker(target, btn);
+    const current = parseFlexibleDate(target.value);
+    nat.value = current || '';
+  });
+  nat.addEventListener('change', () => {
+    const target = document.getElementById(nat.dataset.for);
+    if (!target) return;
+    target.value = nat.value;
+    target.classList.remove('invalid');
   });
 });
-
-// 📅 버튼 클릭 시 그 버튼 위치에 숨겨진 네이티브 달력을 잠깐 붙여 선택하게 하고,
-// 고른 값을 텍스트 입력칸에 그대로 채워 넣습니다.
-// (버튼 위치에 맞춰 붙여야 달력 팝업이 화면 구석이 아니라 버튼 바로 아래에 뜹니다.)
-function openNativeDatePicker(targetInput, anchorEl) {
-  const rect = (anchorEl || targetInput).getBoundingClientRect();
-  const temp = document.createElement('input');
-  temp.type = 'date';
-  temp.style.position = 'fixed';
-  temp.style.opacity = '0';
-  temp.style.pointerEvents = 'none';
-  temp.style.top = rect.top + 'px';
-  temp.style.left = rect.left + 'px';
-  temp.style.width = rect.width + 'px';
-  temp.style.height = rect.height + 'px';
-  const current = parseFlexibleDate(targetInput.value);
-  if (current) temp.value = current;
-  document.body.appendChild(temp);
-
-  const cleanup = () => { if (temp.parentNode) temp.parentNode.removeChild(temp); };
-  temp.addEventListener('change', () => {
-    targetInput.value = temp.value;
-    targetInput.classList.remove('invalid');
-    cleanup();
-  });
-  temp.addEventListener('blur', () => setTimeout(cleanup, 200));
-
-  if (typeof temp.showPicker === 'function') {
-    try { temp.showPicker(); } catch (e) { temp.focus(); temp.click(); }
-  } else {
-    temp.focus();
-    temp.click();
-  }
-}
 
 function getWeekRange(offset) {
   const now = new Date();
