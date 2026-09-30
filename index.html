@@ -635,19 +635,24 @@ document.querySelectorAll('.date-pick-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = document.getElementById(btn.dataset.for);
     if (!target) return;
-    openNativeDatePicker(target);
+    openNativeDatePicker(target, btn);
   });
 });
 
-// 📅 버튼 클릭 시 숨겨진 네이티브 달력을 잠깐 붙여 선택하게 하고,
+// 📅 버튼 클릭 시 그 버튼 위치에 숨겨진 네이티브 달력을 잠깐 붙여 선택하게 하고,
 // 고른 값을 텍스트 입력칸에 그대로 채워 넣습니다.
-function openNativeDatePicker(targetInput) {
+// (버튼 위치에 맞춰 붙여야 달력 팝업이 화면 구석이 아니라 버튼 바로 아래에 뜹니다.)
+function openNativeDatePicker(targetInput, anchorEl) {
+  const rect = (anchorEl || targetInput).getBoundingClientRect();
   const temp = document.createElement('input');
   temp.type = 'date';
   temp.style.position = 'fixed';
   temp.style.opacity = '0';
-  temp.style.left = '-9999px';
-  temp.style.top = '0';
+  temp.style.pointerEvents = 'none';
+  temp.style.top = rect.top + 'px';
+  temp.style.left = rect.left + 'px';
+  temp.style.width = rect.width + 'px';
+  temp.style.height = rect.height + 'px';
   const current = parseFlexibleDate(targetInput.value);
   if (current) temp.value = current;
   document.body.appendChild(temp);
